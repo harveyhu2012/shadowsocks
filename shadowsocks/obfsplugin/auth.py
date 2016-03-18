@@ -345,12 +345,12 @@ class auth_sha1(verify_base):
         self.recv_buf = b''
         self.unit_len = 8100
         self.decrypt_packet_num = 0
-        self.raw_trans = False
+        self.raw_trans = False #原包传送，如果解码失败就原包传送
         self.has_sent_header = False
         self.has_recv_header = False
         self.client_id = 0
         self.connection_id = 0
-        self.max_time_dif = 60 * 60 # time dif (second) setting
+        self.max_time_dif = 60 * 60 # time dif (second) setting # 客户端与服务器端相差不能超过1小时
 
     def init_data(self):
         return obfs_auth_data()
@@ -449,13 +449,15 @@ class auth_sha1(verify_base):
         return ret
 
     def server_post_decrypt(self, buf):
+        # 服务端解码（接受客户端申请，解析后可以得到需要访问的地址）
         if self.raw_trans:
             return buf
-        self.recv_buf += buf
-        out_buf = b''
-        if not self.has_recv_header:
-            if len(self.recv_buf) < 4:
+        self.recv_buf += buf #输入buf
+        out_buf = b'' #输出buf
+        if not self.has_recv_header: #尝试从buf中分解出头部
+            if len(self.recv_buf) < 4: #长度太短
                 return b''
+            # crc校验：前四个元素应该等于密码的crc值
             crc = struct.pack('<I', binascii.crc32(self.server_info.key) & 0xFFFFFFFF)
             if crc != self.recv_buf[:4]:
                 if self.method == 'auth_sha1':
@@ -463,13 +465,17 @@ class auth_sha1(verify_base):
                 else:
                     self.raw_trans = True
                     return self.recv_buf
+            # 4-6个元素是buf长度
             length = struct.unpack('>H', self.recv_buf[4:6])[0]
             if length > len(self.recv_buf):
                 return b''
+            #计算sha1值，来源有recv_id key 收到buf[除最后10位]
             sha1data = hmac.new(self.server_info.recv_iv + self.server_info.key, self.recv_buf[:length - 10], hashlib.sha1).digest()[:10]
+            # sha1应该与最后10位相等
             if sha1data != self.recv_buf[length - 10:length]:
                 logging.error('auth_sha1 data uncorrect auth HMAC-SHA1')
                 return b'E'
+            # 第6个元素记录起始位置，结束位置=len-10
             pos = common.ord(self.recv_buf[6]) + 6
             out_buf = self.recv_buf[pos:length - 10]
             if len(out_buf) < 12:
@@ -477,6 +483,7 @@ class auth_sha1(verify_base):
                 self.recv_buf = b''
                 logging.info('auth_sha1: too short')
                 return b'E'
+            # 校验时间
             utc_time = struct.unpack('<I', out_buf[:4])[0]
             client_id = struct.unpack('<I', out_buf[4:8])[0]
             connection_id = struct.unpack('<I', out_buf[8:12])[0]
@@ -489,7 +496,7 @@ class auth_sha1(verify_base):
                 return b'E'
             elif self.server_info.data.insert(client_id, connection_id):
                 self.has_recv_header = True
-                out_buf = out_buf[12:]
+                out_buf = out_buf[12:] #实际输出从12开始
                 self.client_id = client_id
                 self.connection_id = connection_id
             else:
@@ -501,6 +508,7 @@ class auth_sha1(verify_base):
             self.has_recv_header = True
 
         while len(self.recv_buf) > 2:
+            # 分段 每段长度 是 前两个元素
             length = struct.unpack('>H', self.recv_buf[:2])[0]
             if length >= 8192 or length < 7:
                 self.raw_trans = True
@@ -512,7 +520,7 @@ class auth_sha1(verify_base):
                     raise Exception('server_post_decrype data error')
             if length > len(self.recv_buf):
                 break
-
+            #每段还要checksum校验，最后4个元素是checksum值
             if struct.pack('<I', zlib.adler32(self.recv_buf[:length - 4]) & 0xFFFFFFFF) != self.recv_buf[length - 4:length]:
                 logging.info('auth_sha1: checksum error, data %s' % (binascii.hexlify(self.recv_buf[:length]),))
                 self.raw_trans = True
@@ -521,10 +529,9 @@ class auth_sha1(verify_base):
                     return b'E'
                 else:
                     raise Exception('server_post_decrype data uncorrect checksum')
-
-            pos = common.ord(self.recv_buf[2]) + 2
-            out_buf += self.recv_buf[pos:length - 4]
-            self.recv_buf = self.recv_buf[length:]
+            pos = common.ord(self.recv_buf[2]) + 2 # 开始位置
+            out_buf += self.recv_buf[pos:length - 4] # 去掉校验位
+            self.recv_buf = self.recv_buf[length:] # 到下一段
 
         if out_buf:
             self.server_info.data.update(self.client_id, self.connection_id)
