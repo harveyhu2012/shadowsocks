@@ -574,7 +574,7 @@ class TCPRelayHandler(object):
         self._update_activity(len(data))
         if not is_local: # 解密的顺序与加密的顺序相关
             if self._encrypt_correct:
-                obfs_decode = self._obfs.server_decode(data) # 1 反混淆
+                obfs_decode = self._obfs.server_decode(data) # 1 反混淆 （返回3个值，obfs_decode[0]是反混淆结果，obfs_decode[2]是是否发一个空回应，obfs_decode[1]是是否要解密）
                 if obfs_decode[2]:
                     self._write_to_sock(b'', self._local_sock)
                 if obfs_decode[1]:
