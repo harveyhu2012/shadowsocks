@@ -1,3 +1,20 @@
+Skip to content
+This repository  
+Search
+Pull requests
+Issues
+Gist
+ @harveyhu2012
+ Unwatch 1
+  Star 0
+  Fork 7,798 harveyhu2012/shadowsocks
+forked from breakwa11/shadowsocks
+ Code  Pull requests 0  Wiki  Pulse  Graphs  Settings
+Branch: master Find file Copy pathshadowsocks/shadowsocks/encrypt.py
+944815f  22 hours ago
+@harveyhu2012 harveyhu2012 Update encrypt.py
+4 contributors @clowwindy @breakwa11 @felixonmars @harveyhu2012
+RawBlameHistory     204 lines (173 sloc)  6.07 KB
 #!/usr/bin/env python
 #
 # Copyright 2012-2015 clowwindy
@@ -43,7 +60,7 @@ cached_keys = {}
 def try_cipher(key, method=None):
     Encryptor(key, method)
 
-
+# 由password生成key和iv
 def EVP_BytesToKey(password, key_len, iv_len):
     # equivalent to OpenSSL's EVP_BytesToKey() with count 1
     # so that we make the same key and iv as nodejs version
@@ -55,6 +72,7 @@ def EVP_BytesToKey(password, key_len, iv_len):
         return r
     m = []
     i = 0
+    # 长度不够就重复做
     while len(b''.join(m)) < (key_len + iv_len):
         md5 = hashlib.md5()
         data = password
@@ -78,11 +96,11 @@ class Encryptor(object):
         self.iv_sent = False
         self.cipher_iv = b''
         self.iv_buf = b''
-        self.cipher_key = b''
         self.decipher = None
         method = method.lower()
         self._method_info = self.get_method_info(method)
         if self._method_info:
+            # 初始化过程，iv是随机生成的
             self.cipher = self.get_cipher(key, method, 1,
                                           random_string(self._method_info[1]))
         else:
@@ -97,22 +115,25 @@ class Encryptor(object):
     def iv_len(self):
         return len(self.cipher_iv)
 
+    # 有点像工厂模式，提供密码、加密方式、加密还是解密（如果是解密再提供iv）
+    # 返回结果是加密（或者解密）的类的实例
     def get_cipher(self, password, method, op, iv):
         password = common.to_bytes(password)
-        m = self._method_info
+        m = self._method_info # 返回2个值，1是key的长度 2是iv的长度
         if m[0] > 0:
-            key, iv_ = EVP_BytesToKey(password, m[0], m[1])
+            key, iv_ = EVP_BytesToKey(password, m[0], m[1]) # 返回的iv值被忽略
         else:
             # key_length == 0 indicates we should use the key directly
+            # key长度==0的话，直接用password当做key，iv为空
             key, iv = password, b''
 
         iv = iv[:m[1]]
-        if op == 1:
+        if op == 1: # op == 1 加密 op == 0 解密
             # this iv is for cipher not decipher
             self.cipher_iv = iv[:m[1]]
-        self.cipher_key = key
         return m[2](method, key, iv, op)
-
+    
+    # encrypt和下面的encrypt_all功能类似，只是调用方法不一样，一个是
     def encrypt(self, buf):
         if len(buf) == 0:
             return buf
@@ -132,6 +153,7 @@ class Encryptor(object):
         if len(self.iv_buf) <= decipher_iv_len:
             self.iv_buf += buf
         if len(self.iv_buf) > decipher_iv_len:
+            # 切成两半，前一半是iv，后一半是内容
             decipher_iv = self.iv_buf[:decipher_iv_len]
             self.decipher = self.get_cipher(self.key, self.method, 0,
                                             iv=decipher_iv)
@@ -141,7 +163,7 @@ class Encryptor(object):
         else:
             return b''
 
-def encrypt_all(password, method, op, data):
+def encrypt_all(password, method, op, data): # op == 1 加密 op == 0 解密
     result = []
     method = method.lower()
     (key_len, iv_len, m) = method_supported[method]
@@ -149,46 +171,13 @@ def encrypt_all(password, method, op, data):
         key, _ = EVP_BytesToKey(password, key_len, iv_len)
     else:
         key = password
-    if op:
+    if op: # op == 1加密 ，生成一个iv
         iv = random_string(iv_len)
         result.append(iv)
     else:
+        # 解密 从data中取iv
         iv = data[:iv_len]
         data = data[iv_len:]
-    cipher = m(method, key, iv, op)
-    result.append(cipher.update(data))
-    return b''.join(result)
-
-def encrypt_key(password, method):
-    method = method.lower()
-    (key_len, iv_len, m) = method_supported[method]
-    if key_len > 0:
-        key, _ = EVP_BytesToKey(password, key_len, iv_len)
-    else:
-        key = password
-    return key
-
-def encrypt_iv_len(method):
-    method = method.lower()
-    (key_len, iv_len, m) = method_supported[method]
-    return iv_len
-
-def encrypt_new_iv(method):
-    method = method.lower()
-    (key_len, iv_len, m) = method_supported[method]
-    return random_string(iv_len)
-
-def encrypt_all_iv(key, method, op, data, ref_iv):
-    result = []
-    method = method.lower()
-    (key_len, iv_len, m) = method_supported[method]
-    if op:
-        iv = ref_iv[0]
-        result.append(iv)
-    else:
-        iv = data[:iv_len]
-        data = data[iv_len:]
-        ref_iv[0] = iv
     cipher = m(method, key, iv, op)
     result.append(cipher.update(data))
     return b''.join(result)
@@ -229,3 +218,5 @@ def test_encrypt_all():
 if __name__ == '__main__':
     test_encrypt_all()
     test_encryptor()
+Status API Training Shop Blog About
+© 2016 GitHub, Inc. Terms Privacy Security Contact Help
