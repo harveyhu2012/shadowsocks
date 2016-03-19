@@ -1,20 +1,3 @@
-Skip to content
-This repository  
-Search
-Pull requests
-Issues
-Gist
- @harveyhu2012
- Unwatch 1
-  Star 0
-  Fork 7,798 harveyhu2012/shadowsocks
-forked from breakwa11/shadowsocks
- Code  Pull requests 0  Wiki  Pulse  Graphs  Settings
-Branch: master Find file Copy pathshadowsocks/shadowsocks/encrypt.py
-944815f  22 hours ago
-@harveyhu2012 harveyhu2012 Update encrypt.py
-4 contributors @clowwindy @breakwa11 @felixonmars @harveyhu2012
-RawBlameHistory     204 lines (173 sloc)  6.07 KB
 #!/usr/bin/env python
 #
 # Copyright 2012-2015 clowwindy
@@ -218,5 +201,3 @@ def test_encrypt_all():
 if __name__ == '__main__':
     test_encrypt_all()
     test_encryptor()
-Status API Training Shop Blog About
-© 2016 GitHub, Inc. Terms Privacy Security Contact Help
