@@ -598,11 +598,11 @@ class TCPRelayHandler(object):
             self.destroy()
             return
         ogn_data = data
-        if not is_local:
+        if not is_local: # 解密的顺序与加密的顺序相反
             if self._encryptor is not None:
                 if self._encrypt_correct:
                     try:
-                        obfs_decode = self._obfs.server_decode(data)
+                        obfs_decode = self._obfs.server_decode(data) # 1 混淆解密 （返回3个值，obfs_decode[0]是反混淆结果，obfs_decode[2]是是否发一个空回应，obfs_decode[1]是是否要解密）
                     except Exception as e:
                         shell.print_exception(e)
                         self.destroy()
@@ -612,12 +612,12 @@ class TCPRelayHandler(object):
                     if obfs_decode[1]:
                         if not self._protocol.obfs.server_info.recv_iv:
                             iv_len = len(self._protocol.obfs.server_info.iv)
-                            self._protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
-                        data = self._encryptor.decrypt(obfs_decode[0])
+                            self._protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len] #每次的iv值是随机生成的 recv_iv是从接收到串中拆解出来的，这两个值每次LOOP都不一样
+                        data = self._encryptor.decrypt(obfs_decode[0]) # 2 解密decrypt（原版）
                     else:
                         data = obfs_decode[0]
                     try:
-                        data = self._protocol.server_post_decrypt(data)
+                        data = self._protocol.server_post_decrypt(data) # 3 协议解密
                     except Exception as e:
                         shell.print_exception(e)
                         self.destroy()
